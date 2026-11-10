@@ -1,0 +1,39 @@
+"""Runs all signal checks and turns their findings into a score and a verdict."""
+
+import logging
+
+from models import AnalysisResult, EmailInput, Reason
+
+logger = logging.getLogger(__name__)
+
+MAX_SCORE = 100
+SUSPICIOUS_THRESHOLD = 25
+PHISHING_THRESHOLD = 60
+
+# Each check receives the email and returns a list of Reasons (empty if nothing was found).
+# Checks are added here as they are built.
+CHECKS = []
+
+
+def verdict_for(score: int) -> str:
+    """Translate a numeric score into a verdict."""
+    if score >= PHISHING_THRESHOLD:
+        return "Likely phishing"
+    if score >= SUSPICIOUS_THRESHOLD:
+        return "Suspicious"
+    return "Low risk"
+
+
+def analyze_email(email: EmailInput) -> AnalysisResult:
+    """Run every check, sum the points, and build the result."""
+    reasons: list[Reason] = []
+    for check in CHECKS:
+        try:
+            reasons.extend(check(email))
+        except Exception:
+            # Email content is untrusted: one failing check must not break the whole analysis
+            logger.exception("Check %s failed", check.__name__)
+
+    score = min(sum(reason.points for reason in reasons), MAX_SCORE)
+    reasons.sort(key=lambda reason: reason.points, reverse=True)
+    return AnalysisResult(score=score, verdict=verdict_for(score), reasons=reasons)
