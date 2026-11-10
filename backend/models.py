@@ -19,6 +19,7 @@ class EmailInput(BaseModel):
     body_text: str = Field(default="", max_length=50_000)
     body_html: str = Field(default="", max_length=200_000)
     attachments: list[Attachment] = Field(default_factory=list, max_length=20)
+    attachment_count: int = Field(default=0, ge=0)
 
 
 class Reason(BaseModel):

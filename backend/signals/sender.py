@@ -56,7 +56,7 @@ def check_display_name(email: EmailInput) -> list[Reason]:
                            points=30)]
     return []
 
-def _imitated_brand(domain: str) -> str | None:
+def imitated_brand(domain: str) -> str | None:
     """Return the brand a domain imitates (paypa1.com, aws-billing.net), or None."""
     if base_domain(domain) in FREE_MAIL_DOMAINS:
         return None
@@ -84,7 +84,7 @@ def check_lookalike_domain(email: EmailInput) -> list[Reason]:
         reasons.append(Reason(signal="punycode_domain",
                               detail=f"The sender domain {domain} uses encoded characters that can hide look-alike letters",
                               points=20))
-    brand = _imitated_brand(domain)
+    brand = imitated_brand(domain)
     if brand:
         reasons.append(Reason(signal="lookalike_domain",
                               detail=f"The sender domain {domain} imitates {brand} but does not belong to it",

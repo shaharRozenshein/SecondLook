@@ -5,7 +5,9 @@ import logging
 from models import AnalysisResult, EmailInput, Reason
 from signals.auth import check_authentication
 from signals.sender import check_display_name, check_lookalike_domain, check_reply_to, check_sender_format
-
+from signals.attachments import check_attachments
+from signals.links import check_links
+from signals.pressure import check_pressure
 logger = logging.getLogger(__name__)
 
 MAX_SCORE = 100
@@ -19,6 +21,9 @@ CHECKS = [
     check_display_name,
     check_lookalike_domain,
     check_reply_to,
+    check_links,
+    check_pressure,
+    check_attachments,
 ]
 
 def verdict_for(score: int) -> str:
