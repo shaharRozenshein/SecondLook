@@ -3,6 +3,8 @@
 import logging
 
 from models import AnalysisResult, EmailInput, Reason
+from signals.auth import check_authentication
+from signals.sender import check_display_name, check_lookalike_domain, check_reply_to, check_sender_format
 
 logger = logging.getLogger(__name__)
 
@@ -11,9 +13,13 @@ SUSPICIOUS_THRESHOLD = 25
 PHISHING_THRESHOLD = 60
 
 # Each check receives the email and returns a list of Reasons (empty if nothing was found).
-# Checks are added here as they are built.
-CHECKS = []
-
+CHECKS = [
+    check_authentication,
+    check_sender_format,
+    check_display_name,
+    check_lookalike_domain,
+    check_reply_to,
+]
 
 def verdict_for(score: int) -> str:
     """Translate a numeric score into a verdict."""
