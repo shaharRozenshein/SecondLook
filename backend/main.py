@@ -3,7 +3,8 @@
 import os
 import secrets
 
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi.responses import JSONResponse
 
 from models import AnalysisResult, EmailInput
 from scoring import analyze_email
@@ -11,7 +12,28 @@ from scoring import analyze_email
 # The API key is read from the environment, never hard-coded in the repo
 API_KEY = os.environ.get("API_KEY")
 
-app = FastAPI(title="Second Look API")
+# Interactive API docs help during development, but in production they would publicly
+# describe the API, so they are off unless explicitly enabled
+DOCS_ENABLED = os.environ.get("ENABLE_DOCS") == "true"
+
+# Largest request accepted; real requests are far smaller (all field limits add up to ~260 KB)
+MAX_BODY_BYTES = 1_000_000
+
+app = FastAPI(
+    title="Second Look API",
+    docs_url="/docs" if DOCS_ENABLED else None,
+    redoc_url=None,
+    openapi_url="/openapi.json" if DOCS_ENABLED else None,
+)
+
+
+@app.middleware("http")
+async def limit_request_size(request: Request, call_next):
+    """Reject oversized requests before reading them, to protect the server's memory."""
+    declared_size = request.headers.get("content-length", "0")
+    if not declared_size.isdigit() or int(declared_size) > MAX_BODY_BYTES:
+        return JSONResponse(status_code=413, content={"detail": "Request too large"})
+    return await call_next(request)
 
 
 def require_api_key(x_api_key: str = Header(default="")) -> None:

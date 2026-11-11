@@ -44,3 +44,13 @@ def test_oversized_input_is_rejected():
     email = {"sender": "Dana <dana@company.com>", "subject": "x" * 1001}
     response = client.post("/analyze", json=email, headers={"X-API-Key": "test-key"})
     assert response.status_code == 422
+
+def test_docs_are_disabled_by_default():
+    assert client.get("/docs").status_code == 404
+    assert client.get("/openapi.json").status_code == 404
+
+
+def test_huge_request_is_rejected_before_parsing():
+    response = client.post("/analyze", content="x" * 1_100_000,
+                           headers={"X-API-Key": "test-key", "Content-Type": "application/json"})
+    assert response.status_code == 413
