@@ -12,14 +12,29 @@
  */
 
 // Called by Gmail whenever the user opens an email
+// Called by Gmail whenever the user opens an email
 function onGmailMessageOpen(e) {
   GmailApp.setCurrentMessageAccessToken(e.gmail.accessToken);
   const message = GmailApp.getMessageById(e.gmail.messageId);
+  const attachments = message.getAttachments({ includeInlineImages: false });
 
-  // Send only the fields the backend needs, trimmed to its size limits
+  // Send only what the analysis needs, trimmed to the backend's size limits.
+  // Attachment contents never leave Google: only name, type and size are sent.
   const emailData = {
-    sender: (message.getFrom() || '').slice(0, 500),
-    subject: (message.getSubject() || '').slice(0, 1000)
+    sender: truncate(message.getFrom(), 500),
+    reply_to: truncate(message.getReplyTo(), 500),
+    subject: truncate(message.getSubject(), 1000),
+    auth_results: truncate(message.getHeader('Authentication-Results'), 5000),
+    body_text: truncate(message.getPlainBody(), 50000),
+    body_html: truncate(message.getBody(), 200000),
+    attachments: attachments.slice(0, 20).map(function (attachment) {
+      return {
+        name: truncate(attachment.getName(), 300),
+        content_type: truncate(attachment.getContentType(), 200),
+        size: attachment.getSize()
+      };
+    }),
+    attachment_count: attachments.length
   };
 
   const result = analyzeEmail(emailData);
@@ -106,4 +121,9 @@ function escapeHtml(text) {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
+}
+
+// Converts any value to text and trims it to the backend's size limit
+function truncate(value, maxLength) {
+  return String(value || '').slice(0, maxLength);
 }
