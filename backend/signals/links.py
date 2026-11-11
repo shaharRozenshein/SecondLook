@@ -8,6 +8,7 @@ from urllib.parse import urlparse
 from domains import base_domain
 from models import EmailInput, Reason
 from signals.sender import imitated_brand
+from signals.sender import brand_in_subdomain, imitated_brand
 
 MAX_LINKS = 200
 URL_IN_TEXT = re.compile(r"https?://[^\s<>\"']+", re.IGNORECASE)
@@ -81,7 +82,6 @@ def _is_ip(host: str) -> bool:
     except ValueError:
         return False
 
-
 def check_links(email: EmailInput) -> list[Reason]:
     findings: dict[str, Reason] = {}
 
@@ -105,4 +105,9 @@ def check_links(email: EmailInput) -> list[Reason]:
         brand = imitated_brand(host)
         if brand:
             add("lookalike_link", f"A link leads to {host}, which imitates {brand}", 30)
+        else:
+            sub_brand = brand_in_subdomain(host)
+            if sub_brand:
+                add("brand_subdomain_link",
+                    f"A link leads to {host}, which uses the name {sub_brand} on a domain that does not belong to it", 20)
     return list(findings.values())

@@ -113,6 +113,20 @@ CASES = [
     pytest.param({"sender": "Support <support@company.com>", "subject": "Hi",
                   "body_text": "Billing: https://aws-console-login.com/aws.amazon.com/billing"},
                  30, "Suspicious", {"lookalike_link"}, id="fake-site-with-real-domain-in-path"),
+                     # --- Evasion techniques found in the threat review ---
+    pytest.param({"sender": "Support <support@company.com>", "subject": "Hi",
+                  "body_text": "Verify here: https://paypal.secure-login.com/verify"},
+                 20, "Low risk", {"brand_subdomain_link"}, id="brand-name-as-link-subdomain"),
+    pytest.param({"sender": "PayPal <service@paypal.secure-login.com>", "subject": "Receipt"},
+                 50, "Suspicious", {"display_name_impersonation", "brand_subdomain"},
+                 id="brand-name-as-sender-subdomain"),
+    pytest.param({"sender": "Dana <dana@company.com>", "subject": "Ticket update",
+                  "body_text": "See https://jira.company.com/browse/OPS-1"},
+                 20, "Low risk", {"brand_subdomain_link"}, id="self-hosted-jira-stays-low-risk"),
+    pytest.param({"sender": "Pay\u200bPal Security <alert@secure-mail.net>", "subject": "Hi"},
+                 30, "Suspicious", {"display_name_impersonation"}, id="invisible-character-in-display-name"),
+    pytest.param({"sender": "Support <support@company.com>", "subject": "ur\u200bgent: ver\u200bify your account"},
+                 10, "Low risk", {"pressure_language"}, id="invisible-character-in-pressure-words"),
 ]
 
 

@@ -7,6 +7,7 @@ use urgency too ("Last chance!!"), so it should only add weight to stronger sign
 import re
 
 from models import EmailInput, Reason
+from text import clean_text
 
 MAX_PRESSURE_POINTS = 20
 POINTS_PER_PHRASE = 5
@@ -35,7 +36,7 @@ WARNING_SYMBOLS = ("⚠", "‼", "🚨", "❗", "⛔")
 
 
 def check_pressure(email: EmailInput) -> list[Reason]:
-    text = f"{email.subject}\n{email.body_text}"
+    text = clean_text(f"{email.subject}\n{email.body_text}")
     lowered = text.lower()
 
     phrases = [phrase for phrase in PRESSURE_PHRASES if phrase in lowered]

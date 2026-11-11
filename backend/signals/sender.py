@@ -7,6 +7,7 @@ from difflib import SequenceMatcher
 from brands import BRANDS, FREE_MAIL_DOMAINS
 from domains import base_domain, belongs_to, main_label, normalize_homoglyphs, parse_address
 from models import EmailInput, Reason
+from text import clean_text
 
 SIMILARITY_THRESHOLD = 0.83
 MIN_FUZZY_LENGTH = 5  # short names (aws, okta) must match exactly, to avoid false alarms
@@ -48,7 +49,7 @@ def check_display_name(email: EmailInput) -> list[Reason]:
     name, domain = parse_address(email.sender)
     if not name or not domain:
         return []
-    lowered = name.lower()
+    lowered = clean_text(name).lower()
     for brand_name, brand in BRANDS.items():
         if any(_mentions(lowered, keyword) for keyword in brand["keywords"]) and not _is_legit_for(domain, brand):
             return [Reason(signal="display_name_impersonation",
@@ -75,6 +76,22 @@ def imitated_brand(domain: str) -> str | None:
                 return brand_name
     return None
 
+def brand_in_subdomain(domain: str) -> str | None:
+    """Return the brand whose name appears as a subdomain of an unrelated domain
+    (paypal.secure-login.com), or None. Weaker than a look-alike domain, because
+    companies also host tools at addresses like jira.company.com."""
+    if any(_is_legit_for(domain, brand) for brand in BRANDS.values()):
+        return None
+    base = base_domain(domain)
+    subdomain = domain[: -len(base)].rstrip(".")
+    if not subdomain:
+        return None
+    tokens = set(normalize_homoglyphs(subdomain).replace(".", "-").split("-"))
+    for brand_name, brand in BRANDS.items():
+        if tokens & _lookalike_labels(brand):
+            return brand_name
+    return None
+
 def check_lookalike_domain(email: EmailInput) -> list[Reason]:
     _, domain = parse_address(email.sender)
     if not domain:
@@ -89,6 +106,13 @@ def check_lookalike_domain(email: EmailInput) -> list[Reason]:
         reasons.append(Reason(signal="lookalike_domain",
                               detail=f"The sender domain {domain} imitates {brand} but does not belong to it",
                               points=35))
+    else:
+        sub_brand = brand_in_subdomain(domain)
+        if sub_brand:
+            reasons.append(Reason(signal="brand_subdomain",
+                                  detail=f"The sender domain {domain} uses the name {sub_brand} "
+                                         f"on a domain that does not belong to it",
+                                  points=20))
     return reasons
 
 
