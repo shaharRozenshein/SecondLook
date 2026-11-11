@@ -10,8 +10,23 @@
  *
  * Secrets: BACKEND_URL and API_KEY are stored in Script Properties, not in code.
  */
+// Visual style and advice for each verdict. Unknown verdicts fall back to a neutral style.
+const VERDICT_STYLES = {
+  'Low risk': {
+    color: '#188038', icon: '🟢',
+    advice: 'No warning signs found. Stay alert as usual and verify unexpected requests.'
+  },
+  'Suspicious': {
+    color: '#b06000', icon: '🟡',
+    advice: 'Be careful. Do not click links, open attachments or share details until you verify the sender another way.'
+  },
+  'Likely phishing': {
+    color: '#c5221f', icon: '🔴',
+    advice: 'Do not click links, open attachments or reply. Report it: open the ⋮ menu and choose "Report phishing".'
+  }
+};
+const DEFAULT_STYLE = { color: '#5f6368', icon: '⚪', advice: 'Review this email carefully before acting on it.' };
 
-// Called by Gmail whenever the user opens an email
 // Called by Gmail whenever the user opens an email
 function onGmailMessageOpen(e) {
   GmailApp.setCurrentMessageAccessToken(e.gmail.accessToken);
@@ -73,34 +88,48 @@ function analyzeEmail(emailData) {
   }
 }
 
-// Builds the card with the verdict, score and reasons
+// Builds the card with the verdict, score, advice and reasons
 function buildResultCard(emailData, result) {
-  const card = CardService.newCardBuilder()
-    .setHeader(CardService.newCardHeader().setTitle('Second Look'));
+  const known = Object.prototype.hasOwnProperty.call(VERDICT_STYLES, result.verdict);
+  const style = known ? VERDICT_STYLES[result.verdict] : DEFAULT_STYLE;
+  const verdict = known ? result.verdict : 'Unknown result';
+  const score = Math.max(0, Math.min(100, Number(result.score) || 0));
 
-  const summary = CardService.newCardSection()
-    .addWidget(CardService.newDecoratedText()
-      .setTopLabel('Verdict')
-      .setText(escapeHtml(result.verdict) + ' (' + Number(result.score) + '/100)')
-      .setWrapText(true))
+  // The header is the largest text on the card, so it carries the verdict and the score
+  const card = CardService.newCardBuilder()
+    .setHeader(CardService.newCardHeader()
+      .setTitle(ltr(style.icon + ' ' + verdict))
+      .setSubtitle(ltr('Risk score: ' + score + ' / 100 (higher = more suspicious)')));
+
+  // What to do next, highlighted in the verdict's color
+  card.addSection(CardService.newCardSection()
+    .addWidget(CardService.newTextParagraph()
+      .setText(ltr('<font color="' + style.color + '"><b>What to do</b></font>') + '<br>' + ltr(style.advice))));
+
+  // Reasons, most serious first (the backend already sorts them)
+  const reasons = Array.isArray(result.reasons) ? result.reasons : [];
+  const why = CardService.newCardSection().setHeader('Why this verdict');
+  if (reasons.length === 0) {
+    why.addWidget(CardService.newTextParagraph()
+      .setText(ltr('No warning signs were found in this email.')));
+  }
+  reasons.forEach(function (reason) {
+    why.addWidget(CardService.newDecoratedText()
+      .setText(ltr(escapeHtml(reason.detail)))
+      .setBottomLabel(ltr('+' + Number(reason.points) + ' points'))
+      .setWrapText(true));
+  });
+  card.addSection(why);
+
+  // Analyzed email and an honest reminder of what the tool can and cannot do
+  card.addSection(CardService.newCardSection()
+    .setHeader('Email details')
     .addWidget(CardService.newDecoratedText()
       .setTopLabel('From')
-      .setText(escapeHtml(emailData.sender))
-      .setWrapText(true));
-  card.addSection(summary);
-
-  // A section must contain at least one widget, so add it only if there are reasons
-  const reasons = result.reasons || [];
-  if (reasons.length > 0) {
-    const reasonsSection = CardService.newCardSection().setHeader('Why');
-    reasons.forEach(function (reason) {
-      reasonsSection.addWidget(CardService.newDecoratedText()
-        .setText(escapeHtml(reason.detail))
-        .setBottomLabel('+' + Number(reason.points) + ' points')
-        .setWrapText(true));
-    });
-    card.addSection(reasonsSection);
-  }
+      .setText(ltr(escapeHtml(emailData.sender)))
+      .setWrapText(true))
+    .addWidget(CardService.newTextParagraph()
+      .setText(ltr('<i>Second Look gives a second opinion, not a guarantee. When in doubt, verify with the sender directly.</i>'))));
 
   return card.build();
 }
@@ -108,10 +137,9 @@ function buildResultCard(emailData, result) {
 // Shown when the analysis fails; reveals no technical details to the user
 function buildErrorCard() {
   return CardService.newCardBuilder()
-    .setHeader(CardService.newCardHeader().setTitle('Second Look'))
-    .addSection(CardService.newCardSection()
-      .addWidget(CardService.newTextParagraph()
-        .setText('Could not analyze this email right now. Please try again in a moment.')))
+    .setHeader(CardService.newCardHeader()
+      .setTitle('⚪ Could not analyze this email')
+      .setSubtitle('Please try again in a moment'))
     .build();
 }
 
@@ -126,4 +154,10 @@ function escapeHtml(text) {
 // Converts any value to text and trims it to the backend's size limit
 function truncate(value, maxLength) {
   return String(value || '').slice(0, maxLength);
+}
+
+// Wraps text in Unicode left-to-right isolation marks, so English text and symbols
+// (like "+5 points" or "<name@domain>") display correctly when Gmail is right-to-left
+function ltr(text) {
+  return '\u2066' + text + '\u2069';
 }

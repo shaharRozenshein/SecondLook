@@ -107,6 +107,12 @@ CASES = [
     pytest.param({"sender": "Accounts <ap@vendor.com>", "subject": "Report",
                   "attachments": [{"name": "report.pdf"}], "attachment_count": 1},
                  0, "Low risk", set(), id="normal-attachment"),
+    pytest.param({"sender": "Support <support@company.com>", "subject": "Hi",
+                  "body_text": "Billing: https://console.aws.amazon.com/billing/home?region=us-east-1"},
+                 0, "Low risk", set(), id="legit-aws-deep-link"),
+    pytest.param({"sender": "Support <support@company.com>", "subject": "Hi",
+                  "body_text": "Billing: https://aws-console-login.com/aws.amazon.com/billing"},
+                 30, "Suspicious", {"lookalike_link"}, id="fake-site-with-real-domain-in-path"),
 ]
 
 
